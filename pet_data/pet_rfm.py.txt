@@ -1,0 +1,150 @@
+# === 一鍵執行：RFM 計算（Colab 版）===========================================
+# 1) 安裝與匯入
+!pip -q install pandas numpy matplotlib
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import io, os, sys
+
+# Colab 上傳功能（若非 Colab 環境，會自動略過上傳步驟，改讀工作目錄同名檔）
+IN_COLAB = "google.colab" in sys.modules
+if IN_COLAB:
+    from google.colab import files
+
+# 2) 上傳檔案（Colab 會跳出檔案選擇器）
+expected_files = {
+    "customers": "pet_customer_final_20250929.csv",
+    "orders": "pet_order_final_20250929.csv",
+    "details": "pet_order_detail_final_20250929.csv",
+}
+
+if IN_COLAB:
+    print("請上傳三個檔案：", list(expected_files.values()))
+    uploaded = files.upload()  # 手動選擇上傳
+    # 自動對應使用者所上傳的檔名（容錯，關鍵字匹配）
+    # 如果使用者改了檔名也沒關係，根據關鍵字來抓
+    def find_path(key_hint, default_name):
+        # 先用 uploaded 中的鍵找
+        for k in uploaded.keys():
+            lk = k.lower()
+            if key_hint in lk:
+                return k
+        # 找不到就退回預設名（若工作目錄已有）
+        return default_name if os.path.exists(default_name) else default_name
+
+    customers_fp = find_path("customer", expected_files["customers"])
+    orders_fp    = find_path("order_final", expected_files["orders"])  # 主檔
+    details_fp   = find_path("order_detail", expected_files["details"])
+else:
+    # 非 Colab，直接讀工作目錄的同名檔案（請事先放好）
+    customers_fp = expected_files["customers"]
+    orders_fp    = expected_files["orders"]
+    details_fp   = expected_files["details"]
+
+print("使用檔案：")
+print(" - customers:", customers_fp)
+print(" - orders   :", orders_fp)
+print(" - details  :", details_fp)
+
+# 3) 讀檔
+customers = pd.read_csv(customers_fp)
+orders    = pd.read_csv(orders_fp)
+details   = pd.read_csv(details_fp)
+
+# 4) 合併日期＋時間為時間戳 order_ts（最簡穩定作法）
+def to_ts(date_series, time_series=None):
+    d = date_series.astype(str).fillna("")
+    if time_series is None:
+        ts = pd.to_datetime(d, errors="coerce")
+    else:
+        t = time_series.astype(str).fillna("")
+        dt = (d + " " + t).str.strip()
+        ts = pd.to_datetime(dt, errors="coerce")
+        # 若日期+時間失敗，就僅用日期解析
+        ts2 = pd.to_datetime(d, errors="coerce")
+        ts = ts.fillna(ts2)
+    return ts
+
+orders["order_ts"] = to_ts(orders.get("order_date", ""), orders.get("order_time", ""))
+
+print("\n基本檢查：")
+print("customers:", customers.shape)
+print("orders   :", orders.shape, " | order_ts null =", orders["order_ts"].isna().sum())
+print("details  :", details.shape)
+
+# 5) 建議以「明細加總」作為 Monetary 的來源（最簡版：不排除折扣/非商品）
+#    若需排除折扣/非商品，可在這裡先用 description 過濾後再 groupby。
+detail_sum = details.groupby("order_num", as_index=False)["amount"].sum() \
+                    .rename(columns={"amount": "sum_amount_detail"})
+
+fact_orders = orders.merge(detail_sum, on="order_num", how="left")
+
+# M 的最簡選擇：用明細加總（你也可以改成 orders["order_amt"]）
+fact_orders["m_amount"] = fact_orders["sum_amount_detail"].fillna(0)
+fact_orders["m_source"] = "detail_sum"
+
+# 6) 定義「今天」= 最大訂單時間 + 1 天
+today = fact_orders["order_ts"].max() + pd.Timedelta(days=1)
+
+# 7) 計算 R / F / M
+rfm = fact_orders.groupby("customer_no").agg(
+    R_days   = ("order_ts",  lambda s: (today - s.max()).days),  # 距最近消費天數（越小越好）
+    F_orders = ("order_num", "count"),                            # 訂單次數（越多越好）
+    M_amount = ("m_amount",  "sum"),                              # 金額總和（越高越好）
+).reset_index()
+
+# 8) 打 1–5 分（分位數法，最穩且容易理解）
+def five_rank(series, higher_is_better=True):
+    """
+    回傳 1..5 分（1=最低, 5=最高）
+    - 先用名次避免大量相同值導致 qcut 報錯
+    - higher_is_better: True 表示值越大分數越高（F, M）
+                         False 表示值越小分數越高（R）
+    """
+    r = series.rank(method="first", ascending=not higher_is_better)
+    # qcut 產生 5 段，標籤 1..5
+    bins = pd.qcut(r, 5, labels=[1,2,3,4,5])
+    return bins.astype(int)
+
+rfm["R_rank"] = five_rank(rfm["R_days"],   higher_is_better=False)  # R 越小越好
+rfm["F_rank"] = five_rank(rfm["F_orders"], higher_is_better=True)
+rfm["M_rank"] = five_rank(rfm["M_amount"], higher_is_better=True)
+
+rfm["rfm_score"] = rfm["R_rank"].astype(str) + rfm["F_rank"].astype(str) + rfm["M_rank"].astype(str)
+rfm["rfm_level"] = rfm[["R_rank","F_rank","M_rank"]].sum(axis=1)
+
+print("\nRFM 計算完成！前 5 筆：")
+display(rfm.head())
+
+# 9) 輸出結果檔
+out_csv = "rfm_by_customer.csv"
+rfm.to_csv(out_csv, index=False)
+print(f"\n已輸出：{out_csv}")
+
+if IN_COLAB:
+    from google.colab import files
+    files.download(out_csv)
+
+# 10)（可視化）R×F 熱力圖（顧客數）
+rf_counts = rfm.groupby(["R_rank","F_rank"])["customer_no"].count().reset_index()
+rf_pivot  = rf_counts.pivot(index="R_rank", columns="F_rank", values="customer_no").fillna(0)
+
+plt.figure(figsize=(6,4))
+plt.imshow(rf_pivot.values, cmap="Blues")
+plt.title("R×F Segments Count")
+plt.xlabel("F Rank")
+plt.ylabel("R Rank")
+plt.colorbar(label="Customers")
+plt.xticks(ticks=range(5), labels=[1,2,3,4,5])
+plt.yticks(ticks=range(5), labels=[1,2,3,4,5])
+for i in range(5):
+    for j in range(5):
+        plt.text(j, i, int(rf_pivot.values[i, j]), ha="center", va="center", fontsize=10)
+plt.tight_layout()
+plt.show()
+
+print("\n完成！建議課堂延伸：")
+print(" - 把 M 改成 orders.order_amt 試一次，對比分群差異。")
+print(" - 排除 description 含「折價/其他支付媒體」的明細做 M 再比較。")
+# ========================================================================
