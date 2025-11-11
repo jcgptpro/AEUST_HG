@@ -1,8 +1,8 @@
 
-# 期末專題：運動健身產業資料分析任務清單（學生友善版）
-> 適用檔案：`gym_customer10000.csv`、`gym_order10000.csv`、`gym_orderdetail10000.csv`  
-> 正式作業將提供 2 年資料。請先合成 `order_ts = order_date + order_time`，並以 **明細加總** 作為每筆訂單的 Monetary。  
-> 口徑提示：RFM 打分以 **1＝最好、5＝最差**。
+# 期末專題：運動健身產業資料分析任務清單
+> 適用檔案：`gym_customer.csv`、`gym_order.csv`、`gym_orderdetail.csv`  
+> 正式作業將提供 2 年資料。  
+> 口徑提示：RFM 打分以 **1＝最差、5＝最好**。
 
 ---
 
@@ -114,21 +114,3 @@
     - KPI：活動 uplift、活動後留存
 
 ---
-
-## C. 交付建議（學生報告框架）
-- **目標**：寫清楚要改善哪個指標（例：D30 二單率 +5%）。  
-- **方法**：欄位口徑、時間處理（`order_ts`）、明細加總做 M、RFM 打分（1=好）。  
-- **洞察**：用 3–5 張上面的圖回答「**什麼現象最影響目標**」。  
-- **方案**：對應的行銷動作（名單條件、訊息、時機）；列 KPI。  
-- **風險**：資料口徑（折扣、退貨）、季節性、外部因素。  
-- **下一步**：一項簡單的 A/B 測試設計（文案/時機/折抵額）。
-
----
-
-## 附註：欄位與關聯（速查）
-- 關聯：`customers.customer_no` ←→ `orders.customer_no` ←→ `order_details.order_num`  
-- 時間：`order_ts = to_datetime(order_date + ' ' + order_time)`（解析不到就用日期）  
-- Monetary：以 `order_details.amount` 加總，回寫到訂單後再做顧客層聚合  
-- RFM：`R_days`、`F_orders`、`M_amount` → 五分位成 `R/F/M_rank`（1=最好）
-
-（講師備註：以上每題只需用到 sum、count、mean、比例、簡單成長率；圖形建議折線/長條/熱力即可。）
