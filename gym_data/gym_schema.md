@@ -6,7 +6,7 @@
 
 ## 1) customers 〈會員主檔〉
 - **檔名**：`gym_customer.csv`  
-- **列數**：46,556
+- **列數**：58,115
 - **主鍵建議**：`customer_no`
 
 | 欄位 | 型別 | 說明 |
@@ -21,7 +21,7 @@
 
 ## 2) orders 〈訂單主檔〉
 - **檔名**：`gym_order.csv`  
-- **列數**：73,798
+- **列數**：73,795
 - **主鍵**：`order_num`（每張訂單一列）  
 - **關聯**：`customer_no` → customers.`customer_no`; `order_num` → order_details.`order_num`
 
@@ -38,7 +38,7 @@
 
 ## 3) order_details 〈訂單明細〉
 - **檔名**：`gym_orderdetail.csv`  
-- **列數**：375,412
+- **列數**：266,379
 - **複合鍵建議**：`(order_num, detail_no)`（一張訂單多列）
 
 | 欄位 | 型別 | 說明 |

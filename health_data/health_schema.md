@@ -6,7 +6,7 @@
 
 ## 1) customers 〈會員主檔〉
 - **檔名**：`health_customer.csv`  
-- **列數**：30,352
+- **列數**：35,388
 - **主鍵建議**：`customer_no`
 
 | 欄位 | 型別 | 說明 |
@@ -38,7 +38,7 @@
 
 ## 3) order_details 〈訂單明細〉
 - **檔名**：`health_orderdetail.csv`  
-- **列數**：273,314
+- **列數**：211,475
 - **複合鍵建議**：`(order_num, detail_no)`（一張訂單多列）
 
 | 欄位 | 型別 | 說明 |
